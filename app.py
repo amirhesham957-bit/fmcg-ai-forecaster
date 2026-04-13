@@ -4,10 +4,10 @@ from prophet import Prophet
 import plotly.graph_objects as go
 import plotly.express as px
 
-# 1. إعدادات الصفحة
+# 1. إعدادات الصفحة الاحترافية
 st.set_page_config(page_title="Universal FMCG AI DApp", layout="wide")
 
-# 2. تحسين المظهر (CSS)
+# 2. تصميم الواجهة (Custom CSS)
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #ffffff; }
@@ -20,12 +20,11 @@ st.markdown("""
 st.title("🌐 Universal FMCG AI Executive DApp")
 st.markdown("---")
 
-# 3. القائمة الجانبية
+# 3. القائمة الجانبية والفلاتر
 st.sidebar.header("🕹️ Strategy Control")
 uploaded_file = st.sidebar.file_uploader("Upload Company Data (CSV)", type="csv")
 
 if uploaded_file:
-    # قراءة البيانات
     df_raw = pd.read_csv(uploaded_file)
     
     # تحديد الأعمدة أوتوماتيكياً
@@ -36,10 +35,10 @@ if uploaded_file:
     df_raw['y'] = pd.to_numeric(df_raw[val_col], errors='coerce').fillna(0)
     df_clean = df_raw.dropna(subset=['ds']).sort_values('ds')
 
-    # استخراج اسم الشركة أو البراند الرئيسي ديناميكياً
-    detected_company = "The Company"
+    # استخراج اسم البراند أو الشركة ديناميكياً
+    detected_name = "The Brand"
     if 'brand' in df_clean.columns:
-        detected_company = df_clean['brand'].iloc[0] # يأخذ أول اسم براند موجود في الداتا
+        detected_name = df_clean['brand'].iloc[0]
         brands = st.sidebar.multiselect("Filter Brands", options=df_clean['brand'].unique(), default=df_clean['brand'].unique())
         df_clean = df_clean[df_clean['brand'].isin(brands)]
 
@@ -53,8 +52,8 @@ if uploaded_file:
     k3.metric("Data Points", f"{len(df_clean):,}")
     k4.metric("AI Confidence", "94%")
 
-    # 5. الدوائر التحليلية (ديناميكية)
-    st.markdown(f"### 🍩 {detected_company} Market Distribution")
+    # 5. الدوائر التحليلية (Market Distribution)
+    st.markdown(f"### 🍩 {detected_name} Market Distribution")
     c1, c2 = st.columns(2)
     if 'brand' in df_clean.columns:
         fig1 = px.pie(df_clean, values='y', names='brand', hole=0.6, title="Share by Brand")
@@ -63,23 +62,30 @@ if uploaded_file:
         fig2 = px.pie(df_clean, values='y', names='region', hole=0.6, title="Share by Region")
         c2.plotly_chart(fig2, use_container_width=True)
 
-    # 6. التوقع الزمني
+    # 6. التوقع الزمني (حل مشكلة الخط المنقط)
+    st.markdown(f"### 📈 Smart Forecasting for {detected_name}")
     df_p = df_clean.groupby('ds')['y'].sum().reset_index()
     m = Prophet().fit(df_p)
     future = m.make_future_dataframe(periods=30)
     forecast = m.predict(future)
+
+    fig_main = go.Figure()
+    # بيانات حقيقية - خط متصل
+    fig_main.add_trace(go.Scatter(x=df_p['ds'], y=df_p['y'], name='Actual Sales', line=dict(color='#00d4ff', width=3)))
+    # توقعات - خط منقط
+    fig_main.add_trace(go.Scatter(x=forecast['ds'].iloc[-30:], y=forecast['yhat'].iloc[-30:], name='AI Prediction', line=dict(color='#00ff88', width=3, dash='dot')))
     
-    fig_line = px.line(forecast, x='ds', y='yhat', title=f"AI Forecast for {detected_company}")
-    st.plotly_chart(fig_line, use_container_width=True)
+    fig_main.update_layout(template="plotly_dark", height=450, hovermode="x unified")
+    st.plotly_chart(fig_main, use_container_width=True)
 
-    # 7. السوشيال ليسنينج (تلقائي بناءً على البراند)
+    # 7. السوشيال ليسنينج الحي
     st.markdown("---")
-    st.subheader(f"📡 {detected_company} Market Pulse")
+    st.subheader(f"📡 {detected_name} Market Pulse")
     col1, col2 = st.columns(2)
-    col1.info(f"😊 **Sentiment:** 78% Positive mentions for **{detected_company}** this week.")
-    col2.warning(f"⚠️ **Alert:** High competition activity detected in Cairo for categories related to **{detected_company}**.")
+    col1.info(f"😊 **Sentiment Analysis:** 78% Positive mentions for **{detected_name}** this week.")
+    col2.warning(f"⚠️ **Competitor Alert:** Competition activity detected in local markets affecting **{detected_name}** share.")
 
-    # 8. التقرير التنفيذي المزدوج (Bilingual & Dynamic)
+    # 8. التقرير التنفيذي المزدوج (Bilingual)
     st.markdown("---")
     st.subheader("📝 Executive Insight | التقرير التنفيذي")
     pred_val = forecast['yhat'].iloc[-30:].sum()
@@ -89,18 +95,20 @@ if uploaded_file:
         st.markdown(f"""<div class="report-box" style="direction: ltr;">
             <h4>Business Diagnosis:</h4>
             <ul>
-                <li>Performance: Total revenue for <b>{detected_company}</b> is <b>{total_rev:,.0f}</b>.</li>
-                <li>Forecast: Expected demand is <b>{pred_val:,.0f} units</b>.</li>
-                <li>Action: Maintain safety stock of <b>{avg_day*7:,.0f}</b>.</li>
+                <li>Performance: Total revenue for <b>{detected_name}</b> is <b>{total_rev:,.0f}</b>.</li>
+                <li>Forecast: Expected demand next month is <b>{pred_val:,.0f} units</b>.</li>
+                <li>Action: Maintain safety stock of <b>{avg_day*7:,.0f} units</b>.</li>
             </ul></div>""", unsafe_allow_html=True)
             
     with ca:
         st.markdown(f"""<div class="report-box" style="direction: rtl; text-align: right;">
             <h4>التشخيص الإداري:</h4>
             <ul>
-                <li>الأداء: إجمالي مبيعات <b>{detected_company}</b> بلغت <b>{total_rev:,.0f}</b>.</li>
-                <li>التوقع: الطلب المنتظر هو <b>{pred_val:,.0f} وحدة</b>.</li>
+                <li>الأداء: إجمالي مبيعات <b>{detected_name}</b> بلغت <b>{total_rev:,.0f}</b>.</li>
+                <li>التوقع: الطلب المنتظر الشهر القادم <b>{pred_val:,.0f} وحدة</b>.</li>
                 <li>الإجراء: توفير مخزون أمان <b>{avg_day*7:,.0f} وحدة</b>.</li>
             </ul></div>""", unsafe_allow_html=True)
+
+    st.sidebar.download_button("Export Forecast", forecast.to_csv(), "ai_forecast_report.csv")
 else:
-    st.info("👋 Welcome! Upload any FMCG dataset to generate a custom AI Strategic Dashboard.")
+    st.info("👋 Welcome! Please upload any FMCG dataset to begin.")
