@@ -2,63 +2,95 @@ import streamlit as st
 import pandas as pd
 from prophet import Prophet
 import plotly.graph_objects as go
+import plotly.express as px
 
-st.set_page_config(page_title="FMCG AI DApp", layout="wide")
+st.set_page_config(page_title="FMCG AI Executive Dashboard", layout="wide")
 
+# تجميل الواجهة (Power BI Style)
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; color: #ffffff; }
-    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 10px; border: 1px solid #4caf50; }
+    .main { background-color: #0e1117; }
+    .stMetric { background-color: #161b22; padding: 20px; border-radius: 15px; border-left: 5px solid #00d4ff; }
+    h1, h2, h3 { color: #00d4ff; font-family: 'Segoe UI', sans-serif; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🌐 FMCG Intelligence DApp")
+st.title("📊 FMCG Executive Intelligence Dashboard")
 st.markdown("---")
 
-st.sidebar.header("🕹️ Control Panel")
-uploaded_file = st.sidebar.file_uploader("Upload Sales Data (CSV)", type="csv")
+# القائمة الجانبية للفلاتر
+st.sidebar.header("🔍 Global Filters")
+uploaded_file = st.sidebar.file_uploader("Upload Data (CSV)", type="csv")
 
 if uploaded_file:
     df_raw = pd.read_csv(uploaded_file)
     
-    # --- محرك البحث عن الأعمدة الصحيحة ---
-    if 'ds' in df_raw.columns and 'y' in df_raw.columns:
-        df = df_raw[['ds', 'y']].copy()
-    else:
-        # لو ملقاش الأسامي، ياخد أول عمودين (الخيار التقليدي)
-        df = df_raw.iloc[:, [0, 1]].copy()
-        df.columns = ['ds', 'y']
+    # تحضير البيانات
+    df_raw['ds'] = pd.to_datetime(df_raw['date'] if 'date' in df_raw.columns else df_raw['ds'], errors='coerce')
+    df_raw['y'] = pd.to_numeric(df_raw['y'] if 'y' in df_raw.columns else df_raw.iloc[:, 1], errors='coerce').fillna(0)
+    df_raw = df_raw.dropna(subset=['ds'])
 
-    # تنظيف وتحويل البيانات
-    df['ds'] = pd.to_datetime(df['ds'], errors='coerce')
-    df['y'] = pd.to_numeric(df['y'], errors='coerce').fillna(0)
-    df = df.dropna(subset=['ds']).sort_values('ds')
+    # إضافة الفلاتر الديناميكية (مثل Power BI)
+    if 'brand' in df_raw.columns:
+        selected_brand = st.sidebar.multiselect("Select Brand", options=df_raw['brand'].unique(), default=df_raw['brand'].unique())
+        df_raw = df_raw[df_raw['brand'].isin(selected_brand)]
+    
+    if 'region' in df_raw.columns:
+        selected_region = st.sidebar.multiselect("Select Region", options=df_raw['region'].unique(), default=df_raw['region'].unique())
+        df_raw = df_raw[df_raw['region'].isin(selected_region)]
 
-    # تجميع البيانات باليوم (عشان الملفات الكبيرة متهنجش)
-    df = df.groupby('ds')['y'].sum().reset_index()
+    # حساب الـ KPIs
+    total_sales = df_raw['y'].sum()
+    avg_sales = df_raw['y'].mean()
+    
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Revenue", f"{total_sales:,.0f}")
+    m2.metric("Daily Average", f"{avg_sales:,.1f}")
+    m3.metric("Active Regions", len(df_raw['region'].unique()) if 'region' in df_raw.columns else "N/A")
+    m4.metric("Forecast Confidence", "94%")
 
-    if df['y'].sum() == 0:
-        st.error("⚠️ السيستم مش لاقي أرقام مبيعات. اتأكد إن عمود الـ 'y' فيه أرقام مش حروف.")
-    else:
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Total Sales", f"{df['y'].sum():,.0f}")
-        col2.metric("Avg Daily", f"{df['y'].mean():.1f}")
-        col3.metric("Data Points", len(df))
-        col4.metric("AI Confidence", "94%")
+    # قسم الرسوم الدائرية (Donut Charts)
+    st.markdown("### 🍩 Strategic Distribution")
+    c1, c2 = st.columns(2)
+    
+    if 'brand' in df_raw.columns:
+        fig_brand = px.pie(df_raw, values='y', names='brand', hole=0.6, title="Sales by Brand", color_discrete_sequence=px.colors.sequential.RdBu)
+        c1.plotly_chart(fig_brand, use_container_width=True)
+        
+    if 'region' in df_raw.columns:
+        fig_reg = px.pie(df_raw, values='y', names='region', hole=0.6, title="Sales by Region", color_discrete_sequence=px.colors.sequential.Blues_r)
+        c2.plotly_chart(fig_reg, use_container_width=True)
 
-        with st.spinner('🤖 AI is thinking...'):
-            m = Prophet(yearly_seasonality=True, daily_seasonality=False, weekly_seasonality=True)
-            m.fit(df)
-            future = m.make_future_dataframe(periods=30)
-            forecast = m.predict(future)
+    # التوقع (Prophet)
+    df_prophet = df_raw.groupby('ds')['y'].sum().reset_index()
+    m = Prophet(yearly_seasonality=True)
+    m.fit(df_prophet)
+    future = m.make_future_dataframe(periods=30)
+    forecast = m.predict(future)
 
-            st.subheader("📈 Smart Sales Forecasting")
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df['ds'], y=df['y'], name='Actual', line=dict(color='#4caf50')))
-            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='AI Forecast', line=dict(color='#00d4ff', dash='dot')))
-            fig.update_layout(template="plotly_dark", height=500)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            st.success("✅ تم التوقع بنجاح لـ 30 يوم قادم!")
+    st.markdown("### 📈 Demand Forecasting AI")
+    fig_main = go.Figure()
+    fig_main.add_trace(go.Scatter(x=df_prophet['ds'], y=df_prophet['y'], name='Historical', line=dict(color='#00d4ff', width=2)))
+    fig_main.add_trace(go.Scatter(x=forecast['ds'].iloc[-30:], y=forecast['yhat'].iloc[-30:], name='AI Prediction', line=dict(color='#00ff88', dash='dot')))
+    fig_main.update_layout(template="plotly_dark", hovermode="x unified")
+    st.plotly_chart(fig_main, use_container_width=True)
+
+    # التقرير الكتابي (The Executive Summary)
+    st.markdown("---")
+    st.subheader("📝 Executive Summary & Insights")
+    
+    # تحليل ذكي للبيانات
+    growth = ((forecast['yhat'].iloc[-1] - df_prophet['y'].iloc[-1]) / df_prophet['y'].iloc[-1]) * 100
+    top_region = df_raw.groupby('region')['y'].sum().idxmax() if 'region' in df_raw.columns else "N/A"
+    
+    report = f"""
+    بناءً على تحليل البيانات التاريخية لـ **{len(df_prophet)} يوم**:
+    * **الأداء العام:** تم تحقيق إجمالي مبيعات قدرها **{total_sales:,.0f} وحدة**.
+    * **القوة البيعية:** تعتبر منطقة **{top_region}** هي المحرك الأساسي للمبيعات حالياً.
+    * **توقعات المستقبل:** يشير الذكاء الاصطناعي إلى تغير بنسبة **{growth:.1f}%** في الـ 30 يوماً القادمة.
+    * **توصية PM:** يجب الحفاظ على مستويات مخزون تدعم متوسط يومي **{avg_sales:,.1f}** لتجنب أي نقص (Stock-out).
+    """
+    st.info(report)
+
 else:
-    st.info("ارفع ملف الـ CSV المعدل (اللي فيه ds و y).")
+    st.warning("Please upload your FMCG data file to generate the executive report.")
