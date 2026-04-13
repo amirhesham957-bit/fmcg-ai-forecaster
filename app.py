@@ -49,7 +49,7 @@ if uploaded_file:
     # 4. لوحة المؤشرات (KPIs)
     total_rev = df_clean['y'].sum()
     avg_day = df_clean['y'].mean()
-    growth_rate = "94%" # Confidence Level
+    growth_rate = "94%" 
     
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     kpi1.metric("Total Revenue", f"{total_rev:,.0f}")
@@ -57,16 +57,16 @@ if uploaded_file:
     kpi3.metric("Data Points", f"{len(df_clean):,}")
     kpi4.metric("AI Confidence", growth_rate)
 
-    # 5. الدوائر التحليلية (Donut Charts)
+    # 5. الدوائر التحليلية (تم حل مشكلة الألوان هنا)
     st.markdown("### 🍩 Market Distribution")
     c1, c2 = st.columns(2)
     
     if 'brand' in df_raw.columns:
-        fig_brand = px.pie(df_clean, values='y', names='brand', hole=0.6, title="Share by Brand", color_discrete_sequence=px.colors.sequential.Cyan_r)
+        fig_brand = px.pie(df_clean, values='y', names='brand', hole=0.6, title="Share by Brand", color_discrete_sequence=px.colors.qualitative.Pastel)
         c1.plotly_chart(fig_brand, use_container_width=True)
         
     if 'region' in df_raw.columns:
-        fig_reg = px.pie(df_clean, values='y', names='region', hole=0.6, title="Share by Region", color_discrete_sequence=px.colors.sequential.Mint_r)
+        fig_reg = px.pie(df_clean, values='y', names='region', hole=0.6, title="Share by Region", color_discrete_sequence=px.colors.qualitative.Set2)
         c2.plotly_chart(fig_reg, use_container_width=True)
 
     # 6. التوقع الذكي (Prophet Engine)
@@ -85,7 +85,7 @@ if uploaded_file:
     fig_main.update_layout(template="plotly_dark", hovermode="x unified", height=500)
     st.plotly_chart(fig_main, use_container_width=True)
 
-    # 7. تقرير حل المشكلات التنفيذي (Executive Problem-Solving Report)
+    # 7. تقرير حل المشكلات التنفيذي
     st.markdown("---")
     st.subheader("📝 Executive Insight & Action Plan")
     
