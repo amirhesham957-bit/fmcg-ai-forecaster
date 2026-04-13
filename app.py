@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 
 st.set_page_config(page_title="FMCG AI DApp", layout="wide")
 
-# CSS لإعطاء طابع الـ Web3
 st.markdown("""
     <style>
     .main { background-color: #0e1117; color: #ffffff; }
@@ -20,45 +19,46 @@ st.sidebar.header("🕹️ Control Panel")
 uploaded_file = st.sidebar.file_uploader("Upload Sales Data (CSV)", type="csv")
 
 if uploaded_file:
-    # قراءة البيانات
     df_raw = pd.read_csv(uploaded_file)
     
-    if len(df_raw.columns) < 2:
-        st.error("الملف لازم يكون فيه عمودين على الأقل.")
+    # --- محرك البحث عن الأعمدة الصحيحة ---
+    if 'ds' in df_raw.columns and 'y' in df_raw.columns:
+        df = df_raw[['ds', 'y']].copy()
     else:
-        # --- حل المشكلة: تنظيف البيانات بشكل احترافي ---
-        # بناخد أول عمودين فقط مهما كانت أساميهم ونحولهم لجدول جديد
-        ds_col = pd.to_datetime(df_raw.iloc[:, 0], errors='coerce')
-        y_col = pd.to_numeric(df_raw.iloc[:, 1], errors='coerce').fillna(0)
-        
-        df = pd.DataFrame({'ds': ds_col, 'y': y_col})
-        df = df.dropna().sort_values('ds') # ترتيب وحذف الفراغات
+        # لو ملقاش الأسامي، ياخد أول عمودين (الخيار التقليدي)
+        df = df_raw.iloc[:, [0, 1]].copy()
+        df.columns = ['ds', 'y']
 
-        # المؤشرات السريعة
+    # تنظيف وتحويل البيانات
+    df['ds'] = pd.to_datetime(df['ds'], errors='coerce')
+    df['y'] = pd.to_numeric(df['y'], errors='coerce').fillna(0)
+    df = df.dropna(subset=['ds']).sort_values('ds')
+
+    # تجميع البيانات باليوم (عشان الملفات الكبيرة متهنجش)
+    df = df.groupby('ds')['y'].sum().reset_index()
+
+    if df['y'].sum() == 0:
+        st.error("⚠️ السيستم مش لاقي أرقام مبيعات. اتأكد إن عمود الـ 'y' فيه أرقام مش حروف.")
+    else:
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Sales", f"{df['y'].sum():,.0f}")
-        col2.metric("Avg Demand", f"{df['y'].mean():.1f}")
-        col3.metric("Data Rows", len(df))
+        col2.metric("Avg Daily", f"{df['y'].mean():.1f}")
+        col3.metric("Data Points", len(df))
         col4.metric("AI Confidence", "94%")
 
-        # المحرك الذكي
-        with st.spinner('AI is processing...'):
-            try:
-                m = Prophet(yearly_seasonality=True, daily_seasonality=True)
-                m.fit(df)
-                future = m.make_future_dataframe(periods=14)
-                forecast = m.predict(future)
+        with st.spinner('🤖 AI is thinking...'):
+            m = Prophet(yearly_seasonality=True, daily_seasonality=False, weekly_seasonality=True)
+            m.fit(df)
+            future = m.make_future_dataframe(periods=30)
+            forecast = m.predict(future)
 
-                # الرسم البياني التفاعلي
-                st.subheader("📈 Smart Sales Forecasting")
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df['ds'], y=df['y'], name='Actual Sales', line=dict(color='#4caf50', width=2)))
-                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='AI Prediction', line=dict(color='#00d4ff', dash='dot')))
-                fig.update_layout(template="plotly_dark", hovermode="x unified", height=500)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.success("✅ تم تحليل البيانات بنجاح!")
-            except Exception as e:
-                st.error(f"حدث خطأ في الموديل: {e}")
+            st.subheader("📈 Smart Sales Forecasting")
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=df['ds'], y=df['y'], name='Actual', line=dict(color='#4caf50')))
+            fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], name='AI Forecast', line=dict(color='#00d4ff', dash='dot')))
+            fig.update_layout(template="plotly_dark", height=500)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.success("✅ تم التوقع بنجاح لـ 30 يوم قادم!")
 else:
-    st.info("ارفع ملف الـ CSV (تأكد أن العمود الأول هو التاريخ والثاني هو المبيعات).")
+    st.info("ارفع ملف الـ CSV المعدل (اللي فيه ds و y).")
